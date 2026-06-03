@@ -361,7 +361,7 @@ const vFocus = { mounted: (el) => el.focus() }
 const chatInputRef = ref(null)
 
 let ws = null
-const API_URL = 'http://localhost:8000' // 後端 API 位址
+const API_URL = import.meta.env.PROD ? '' : 'http://localhost:8000' // 後端 API 位址
 
 // 1. 日期格式化函式 (處理 今天/昨天/星期幾)
 const formatSystemDate = (dateStr) => {
@@ -640,8 +640,23 @@ const deleteMessage = async (msgId) => {
 const connectWebSocket = () => {
   if (!token.value) return
 
-  // [修改] 網址不再傳 nickname，而是傳 token
-  ws = new WebSocket(`ws://127.0.0.1:8000/ws?token=${token.value}`)
+  // 1. 自動判斷協定：如果是 https 就用 wss，否則用 ws
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  
+  // 2. 自動判斷主機：
+  // 在本機開發時，因為 Nuxt (3000) 跟 FastAPI (8000) 不同 Port，所以要特判
+  // 在正式環境(Render)時，因為是合併部署，主機就是自己 (window.location.host)
+  let host = window.location.host
+  
+  if (!import.meta.env.PROD) {
+    // 開發環境強制定向到後端 Port
+    host = '127.0.0.1:8000'
+  }
+
+  // 3. 組合網址
+  const wsUrl = `${protocol}//${host}/ws?token=${token.value}`
+  
+  ws = new WebSocket(wsUrl)
 
   ws.onopen = () => {
     isJoined.value = true

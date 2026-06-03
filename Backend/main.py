@@ -11,6 +11,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, HTTPExceptio
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles # 用來提供靜態檔案存取
 from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
 from typing import Dict, List, Optional
 from pydantic import BaseModel, Field
@@ -30,8 +31,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 UPLOAD_DIR = "static/uploads"
 MAX_FILE_SIZE = 5 * 1024 * 1024 # 5MB
 MAX_MSG_LENGTH = 500
-if not os.path.exists(UPLOAD_DIR):
-    os.makedirs(UPLOAD_DIR)
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # [新增] 密碼雜湊器 (用來把密碼加密，不要存明碼！)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -267,7 +267,7 @@ async def db_writer_worker():
 app = FastAPI(lifespan=lifespan)
 
 # 掛載靜態檔案路徑 (這行一定要加，讓前端讀得到圖片)
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static/uploads", StaticFiles(directory="static/uploads"), name="uploads")
 
 # --- CORS 設定 ---
 app.add_middleware(
@@ -650,6 +650,27 @@ async def delete_message(id: int, authorization: str = Header(None)):
     })
     return {"message": "刪除成功"}
 
+# 2. Nuxt 的靜態資源 (_nuxt 資料夾)
+# 我們等下會在 Dockerfile 裡把 Nuxt 打包好的檔案複製到 /app/frontend
+# Nuxt 3 的資源通常放在 _nuxt 目錄下
+if os.path.exists("frontend/_nuxt"):
+    app.mount("/_nuxt", StaticFiles(directory="frontend/_nuxt"), name="nuxt_assets")
+
+# 3. 處理根目錄與 SPA 路由 (Catch-all route)
+# 這樣使用者重新整理網頁時，才不會變成 404，而是回到 Nuxt 的 index.html
+@app.get("/{full_path:path}")
+async def serve_spa(full_path: str):
+    # 如果是 API 請求，或是上面的 static/uploads，不應該進來這裡
+    # 但因為 FastAPI 路由優先順序，定義在上面的 API 會先被匹配，所以這裡只會抓到「剩下的」
+    
+    # 檢查是否請求了根目錄下的靜態檔 (例如 favicon.ico, robots.txt)
+    file_path = os.path.join("frontend", full_path)
+    if os.path.exists(file_path) and os.path.isfile(file_path):
+        return FileResponse(file_path)
+        
+    # 其他所有路徑 (例如 /chat, /login) 都回傳 index.html
+    return FileResponse("frontend/index.html")
+
 # 允許在 Python 腳本中直接執行
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

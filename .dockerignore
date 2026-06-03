@@ -1,0 +1,41 @@
+# --- 版本控制與 IDE ---
+.git
+.gitignore
+.vscode
+.idea
+
+# --- Python 相關 ---
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env
+venv
+.venv
+pip-log.txt
+pip-delete-this-directory.txt
+
+# --- Node.js / Nuxt 相關 (最重要！) ---
+node_modules
+npm-debug.log
+yarn-error.log
+.nuxt
+.output
+dist
+
+# --- 環境變數與敏感資料 ---
+.env
+.env.*
+*.sqlite3
+*.db
+# (如果你希望 Database.db 不要被複製進去覆蓋掉空的 DB，也可以加進來)
+# Database.db 
+
+# --- 系統檔案 ---
+.DS_Store
+Thumbs.db
+
+# --- Docker 本身 ---
+Dockerfile
+.dockerignore
